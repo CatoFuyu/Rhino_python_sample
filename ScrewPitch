@@ -1,0 +1,109 @@
+import rhinoscriptsyntax as rs
+import math as ma
+import copy
+
+class ScrewThread:
+    
+    def __init__(self, dia, pitch, length):
+        self.dia = float(dia)
+        self.pitch = float(pitch)
+        self.length = float(length)
+        
+        start_point = (0,0,0)
+        end_point=(0,0,self.length)
+        
+        turns = self.length/ self.pitch
+        radius0 = self.dia /2
+        
+        #offset height at pitch_height
+        z_off = self.pitch/2
+        
+        
+        
+        #Screw parameters
+        H = self.pitch * ma.cos(ma.radians(30))
+        H_1 = H-(H/8 + H/4)
+        D_1 = self.dia - (2*H_1)
+        D_2 = (self.dia + D_1)/2
+        D_3 = self.dia - (2*H*(1 - 1/8 - 1/6))
+        D_4 = (D_2 + D_3 )/2
+        
+        
+        
+        tip_circle_R = (D_3 * 0.7) /2
+        
+        first_point = [tip_circle_R, 0, 0]
+        
+        taper_length = radius0 - tip_circle_R
+        second_point = [radius0, 0, taper_length]
+        line_01 = rs.AddLine(first_point, second_point)
+        
+        third_point = [radius0,0,self.length]
+        line_02 = rs.AddLine(second_point,third_point)
+        
+        
+        #list for outfir line
+        screw_crvs = [line_01, line_02]
+        joined_screwcrvs = rs.JoinCurves(screw_crvs, True)
+        screw_srf = rs.AddRevSrf(joined_screwcrvs,((0,0,0), (0,0,1)))
+        rs.CapPlanarHoles(screw_srf)
+        screw_srf_2 = rs.CopyObject(screw_srf)
+        
+        
+        out_R = self.dia/2 + H/8
+        rail_1 = rs.AddSpiral(start_point,end_point, self.pitch, turns, out_R)
+        point_01= rs.CurveStartPoint(rail_1)
+        
+        #offset height at pitch_height
+        z_off = self.pitch/2
+        
+        in_radius = D_3/2
+        start_point_high = [0, 0, z_off]
+        end_point_high = [0,0,(self.length + z_off)]
+        rail_2 = rs.AddSpiral(start_point_high, end_point_high, self.pitch, turns, in_radius)
+        
+        rails = [rail_1, rail_2]
+        
+        
+        thread_btm_line = (H-(H_1+((D_1-D_3)/2)))* ma.tan(ma.radians(30))
+        
+        #point of middle lower 
+        point_minusZ = self.pitch/2.0 - thread_btm_line
+        z_point_02 = [in_radius, 0 , point_minusZ]
+        print(z_point_02)
+        line_2 = rs.AddLine(point_01, z_point_02)
+        
+        
+        #point of middle higher
+        point_plusZ = self.pitch/2.0 + thread_btm_line
+        print(point_plusZ)
+        z_point_03 = [in_radius, 0 , point_plusZ]
+        line3 = rs.AddLine(z_point_02, z_point_03)
+ 
+        
+        z_point_04 = point_01
+        z_point_04[2] =  self.pitch
+        print(z_point_04)
+        #rs.AddPoint(z_point_04)
+        line_4 = rs.AddLine(z_point_03, z_point_04)
+        
+        
+        curve_list = [line_2, line3, line_4]
+        joinedcurve = rs.JoinCurves(curve_list, True)
+        
+        
+        thread = rs.AddSweep2(rails, joinedcurve)
+        
+        for_bool = rs.BooleanDifference(screw_srf, thread)
+        
+        #move bolt as copy and delete
+        bolt = rs.BooleanDifference(screw_srf_2, for_bool)
+        bolt2 = rs.CopyObject(bolt,(0,0,(self.length*(-1))))
+        rs.DeleteObject(bolt)
+        #delete curves
+        rs.DeleteObject(joined_screwcrvs)
+        rs.DeleteObject(joinedcurve)
+        rs.DeleteObjects(rails)
+
+if __name__=='__main__':
+    ScrewThread(10, 1.5, 20 ) #parameters are Diameter, pitch, length
